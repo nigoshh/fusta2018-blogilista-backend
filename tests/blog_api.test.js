@@ -5,7 +5,7 @@ const Blog = require('../models/blog')
 const User = require('../models/user')
 const { formatBlog } = require('../utils/format')
 const { blogsInDb, getAuth, initialBlogs, initialUsers, newBlog, newUser,
-  nonExistingBlogId, nonExistingUserId, usersInDb } = require('./test_helper')
+  nonExistingBlogId, usersInDb } = require('./test_helper')
 
 describe('retrieving blogs from database', async () => {
 
