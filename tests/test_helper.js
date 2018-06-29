@@ -4,7 +4,7 @@ const User = require('../models/user')
 const { formatBlog, formatUser } = require('../utils/format')
 
 const blogsInDb = async () => {
-  const blogs = await Blog.find({})
+  const blogs = await Blog.find({}).populate('user', { blogs: 0 })
   return blogs.map(formatBlog)
 }
 

@@ -1,6 +1,8 @@
-# fusta2018-puhelinluettelo-backend
+# fusta2018-blogilista-backend
 
 University of Helsinki Full stack open 2018 course assignments
+
+[frontend](https://github.com/nigoshh/fusta2018/tree/master/anekdootit/bloglist-frontend)
 
 NB: to deploy this software (backend, frontend or both) with your own MongoDB database, please create a unique index for the field _username_ in the collection _bloglist-users_. Otherwise username uniqueness isn't enforced, therefore the software doesn't work as intended.
 

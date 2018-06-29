@@ -12,12 +12,13 @@ blogsRouter.get('/', async (req, res) => {
 blogsRouter.get('/:id', async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id)
+      .populate('user', { blogs: 0 })
     if (blog)
       res.json(formatBlog(blog))
     else
       res.status(404).end()
   } catch (e) {
-    res.status(400).send({ error: 'malformatted id' })
+    res.status(400).json({ error: 'malformatted id' })
   }
 })
 
@@ -39,7 +40,10 @@ blogsRouter.post('/', async (req, res) => {
       return res.status(400).json({ error })
     const user = await User.findById(decodedToken.id)
     const blog = { title, author, url, likes: likes || 0, user: user._id }
-    const savedBlog = await new Blog(blog).save()
+    const blogDoc = new Blog(blog)
+    await blogDoc.save()
+    await blogDoc.populate('user', { blogs: 0 }).execPopulate()
+    const savedBlog = blogDoc.toObject()
     user.blogs.push(savedBlog._id)
     await user.save()
     res.status(201).json(formatBlog(savedBlog))
@@ -48,7 +52,7 @@ blogsRouter.post('/', async (req, res) => {
       res.status(401).json({ error: e.message })
     else {
       console.log(e)
-      res.status(500).json({ error: e })
+      res.status(500).json({ error: '500 server error' })
     }
   }
 })
@@ -56,6 +60,7 @@ blogsRouter.post('/', async (req, res) => {
 blogsRouter.put('/:id', async (req, res) => {
   try {
     const { title, author, url, likes } = req.body
+    const id = req.params.id
     let error = ''
     if (!title)
       error += 'title missing'
@@ -67,15 +72,18 @@ blogsRouter.put('/:id', async (req, res) => {
       return res.status(400).json({ error })
     const blog = { title, author, url, likes }
     const updatedBlog = await Blog
-      .findByIdAndUpdate(req.params.id, blog, { new: true })
+      .findByIdAndUpdate(id, blog, { new: true }).populate('user', { blogs: 0 })
     if (updatedBlog)
       res.json(formatBlog(updatedBlog))
-    else {
-      const savedBlog = await new Blog(blog).save()
-      res.status(201).json(formatBlog(savedBlog))
-    }
+    else
+      res.status(404).send({ error: `"${title}" was deleted` })
   } catch (e) {
-    res.status(400).send({ error: 'malformatted id' })
+    if (e.name === 'CastError')
+      res.status(400).json({ error: 'malformatted id' })
+    else {
+      console.log(e)
+      res.status(500).json({ error: '500 server error' })
+    }
   }
 })
 
@@ -90,7 +98,7 @@ blogsRouter.delete('/:id', async (req, res) => {
     const blog = await Blog.findById(req.params.id)
     if (!blog)
       return res.status(404).end()
-    if (blog.user.toString() === decodedToken.id.toString()) {
+    if (!blog.user || blog.user.toString() === decodedToken.id.toString()) {
       const removedBlog = await Blog.findByIdAndRemove(req.params.id)
       if (removedBlog)
         res.status(204).end()
@@ -100,12 +108,12 @@ blogsRouter.delete('/:id', async (req, res) => {
       res.status(401).json({ error: 'invalid token' })
   } catch (e) {
     if (e.name === 'CastError')
-      res.status(400).send({ error: 'malformatted id' })
+      res.status(400).json({ error: 'malformatted id' })
     else if (e.name === 'JsonWebTokenError')
       res.status(401).json({ error: e.message })
     else {
       console.log(e)
-      res.status(500).json({ error: e })
+      res.status(500).json({ error: '500 server error' })
     }
   }
 })

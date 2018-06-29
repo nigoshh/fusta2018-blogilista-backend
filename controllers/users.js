@@ -27,7 +27,10 @@ usersRouter.post('/', async (req, res) => {
     const user = await User.hashPassword(req.body)
     if (user.adult === undefined)
       user.adult = true
-    const savedUser = await new User(user).save()
+    const userDoc = new User(user)
+    await userDoc.save()
+    await userDoc.populate('blogs', { user: 0 }).execPopulate()
+    const savedUser = userDoc.toObject()
     res.status(201).json(formatUser(savedUser))
   } catch (e) {
     if (e.name === 'MongoError' && e.message.startsWith('E11000')) {

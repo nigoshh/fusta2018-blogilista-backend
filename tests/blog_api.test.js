@@ -128,7 +128,7 @@ describe('updating a blog', async () => {
     await Blog.findByIdAndRemove(blogToUpdate.id)
   })
 
-  test('PUT with valid data creates (201) blog that wasn\'t in database', async () => {
+  test.skip('PUT with valid data creates (201) blog that wasn\'t in database', async () => {
     const validNonexistingId = await nonExistingBlogId()
     const blogToUpdate = { ...newBlog, id: validNonexistingId }
     const blogsBeforeOp = await blogsInDb()
@@ -187,8 +187,10 @@ describe('deletion of a blog', async () => {
   test('DELETE succeeds (204) with correct token if blog was in database', async () => {
     const { auth, id } = await getAuth()
     const blog = { ...newBlog, user: id }
-    let addedBlog = await new Blog(blog).save()
-    addedBlog = formatBlog(addedBlog)
+    const blogDoc = new Blog(blog)
+    await blogDoc.save()
+    await blogDoc.populate('user', { blogs: 0 }).execPopulate()
+    const addedBlog = formatBlog(blogDoc.toObject())
     const blogsBeforeOp = await blogsInDb()
     expect(blogsBeforeOp).toContainEqual(addedBlog)
     await api.delete(`/api/blogs/${addedBlog.id}`).set('Authorization', auth)
