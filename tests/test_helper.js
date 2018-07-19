@@ -5,15 +5,20 @@ const { formatBlog, formatUser } = require('../utils/format')
 
 const blogsInDb = async () => {
   const blogs = await Blog.find({}).populate('user', { blogs: 0 })
-  return blogs.map(formatBlog)
+  return JSON.parse(JSON.stringify(blogs.map(formatBlog)))
 }
 
-const getAuth = async () => {
-  const { username, _id } = await User.findOne({})
+const getAuth = async user => {
+  if (!user)
+    user = await User.findOne({})
+  const { username, _id } = user
   const id = _id.toString()
   const auth = 'Bearer ' + jwt.sign({ username, id: _id }, process.env.SECRET)
   return { id, auth }
 }
+
+const getAuthNoId = () =>
+  'Bearer ' + jwt.sign({ username: 'juu' }, process.env.SECRET)
 
 const initialBlogs = [
   {
@@ -119,5 +124,5 @@ const usersInDb = async () => {
   return users.map(formatUser)
 }
 
-module.exports = { blogsInDb, getAuth, initialBlogs, initialUsers,
-  newBlog, newUser, nonExistingBlogId, usersInDb }
+module.exports = { blogsInDb, getAuth, getAuthNoId, initialBlogs,
+  initialUsers, newBlog, newUser, nonExistingBlogId, usersInDb }

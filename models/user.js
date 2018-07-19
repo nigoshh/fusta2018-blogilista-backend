@@ -9,9 +9,6 @@ const userSchema = new mongoose.Schema({
   blogs: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Blog' }]
 })
 
-userSchema.statics.format = ({ _id, username, name, adult, blogs }) =>
-  ({ id: _id.toString(), username, name, adult, blogs })
-
 userSchema.statics.hashPassword = async ({ username, name, password, adult }) => {
   const saltRounds = 10
   const passwordHash = await bcrypt.hash(password, saltRounds)

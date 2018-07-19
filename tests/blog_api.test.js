@@ -4,8 +4,8 @@ const api = supertest(app)
 const Blog = require('../models/blog')
 const User = require('../models/user')
 const { formatBlog } = require('../utils/format')
-const { blogsInDb, getAuth, initialBlogs, initialUsers, newBlog, newUser,
-  nonExistingBlogId, usersInDb } = require('./test_helper')
+const { blogsInDb, getAuth, getAuthNoId, initialBlogs, initialUsers,
+  newBlog, newUser, nonExistingBlogId, usersInDb } = require('./test_helper')
 
 describe('retrieving blogs from database', async () => {
 
@@ -61,6 +61,7 @@ describe('addition of a new blog', async () => {
       .post('/api/blogs').set('Authorization', auth).send(blog)
       .expect(201)
       .expect('Content-Type', /application\/json/)
+    blog.comments = []
     blog.id = res.body.id
     blog.user = res.body.user
     expect(res.body).toEqual(blog)
@@ -83,9 +84,29 @@ describe('addition of a new blog', async () => {
       .post('/api/blogs').set('Authorization', auth).send(blog)
       .expect(201)
       .expect('Content-Type', /application\/json/)
+    blog.comments = []
     blog.id = res.body.id
     blog.user = res.body.user
     blog.likes = 0
+    expect(res.body).toEqual(blog)
+    const blogsAfterOp = await blogsInDb()
+    expect(blogsAfterOp.length).toBe(blogsBeforeOp.length + 1)
+    expect(blogsBeforeOp).not.toContainEqual(blog)
+    expect(blogsAfterOp).toContainEqual(blog)
+    await Blog.findByIdAndRemove(blog.id)
+  })
+
+  test('if comments is undefined, it gets a default value of []', async () => {
+    const blogsBeforeOp = await blogsInDb()
+    const blog = { ...newBlog }
+    const { auth } = await getAuth()
+    const res = await api
+      .post('/api/blogs').set('Authorization', auth).send(blog)
+      .expect(201)
+      .expect('Content-Type', /application\/json/)
+    blog.comments = []
+    blog.id = res.body.id
+    blog.user = res.body.user
     expect(res.body).toEqual(blog)
     const blogsAfterOp = await blogsInDb()
     expect(blogsAfterOp.length).toBe(blogsBeforeOp.length + 1)
@@ -112,8 +133,9 @@ describe('addition of a new blog', async () => {
 describe('updating a blog', async () => {
 
   test('PUT with valid data updates (200) blog that was already in database', async () => {
-    let blogToUpdate = await new Blog(newBlog).save()
-    blogToUpdate = formatBlog(blogToUpdate)
+    let blogToUpdate = new Blog(newBlog)
+    await blogToUpdate.save()
+    blogToUpdate = formatBlog(blogToUpdate.toObject())
     const blogsBeforeOp = await blogsInDb()
     expect(blogsBeforeOp).toContainEqual(blogToUpdate)
     blogToUpdate.likes++
@@ -128,21 +150,19 @@ describe('updating a blog', async () => {
     await Blog.findByIdAndRemove(blogToUpdate.id)
   })
 
-  test.skip('PUT with valid data creates (201) blog that wasn\'t in database', async () => {
+  test('404 is returned by PUT with valid data for deleted blog', async () => {
     const validNonexistingId = await nonExistingBlogId()
-    const blogToUpdate = { ...newBlog, id: validNonexistingId }
+    const deletedBlog = { ...newBlog, id: validNonexistingId }
     const blogsBeforeOp = await blogsInDb()
-    expect(blogsBeforeOp).not.toContainEqual(blogToUpdate)
-    const res = await api.put(`/api/blogs/${blogToUpdate.id}`).send(blogToUpdate)
-      .expect(201)
+    expect(blogsBeforeOp).not.toContainEqual(deletedBlog)
+    deletedBlog.likes++
+    deletedBlog.comments = ['cool stuff']
+    const res = await api.put(`/api/blogs/${deletedBlog.id}`).send(deletedBlog)
+      .expect(404)
       .expect('Content-Type', /application\/json/)
-    blogToUpdate.id = res.body.id
-    expect(res.body).toEqual(blogToUpdate)
+    expect(res.body.error).toContain(`"${deletedBlog.title}" was deleted`)
     const blogsAfterOp = await blogsInDb()
-    expect(blogsBeforeOp).not.toContainEqual(blogToUpdate)
-    expect(blogsAfterOp).toContainEqual(blogToUpdate)
-    expect(blogsAfterOp.length).toBe(blogsBeforeOp.length + 1)
-    await Blog.findByIdAndRemove(blogToUpdate.id)
+    expect(blogsBeforeOp).toEqual(blogsAfterOp)
   })
 
   test('400 is returned by PUT with valid data but invalid id', async () => {
@@ -154,8 +174,9 @@ describe('updating a blog', async () => {
   })
 
   test('400 is returned by PUT with invalid data', async () => {
-    let blogToUpdate = await new Blog(newBlog).save()
-    blogToUpdate = formatBlog(blogToUpdate)
+    let blogToUpdate = new Blog(newBlog)
+    await blogToUpdate.save()
+    blogToUpdate = formatBlog(blogToUpdate.toObject())
     const blogsBeforeOp = await blogsInDb()
     expect(blogsBeforeOp).toContainEqual(blogToUpdate)
     blogToUpdate.likes++
@@ -178,20 +199,28 @@ describe('updating a blog', async () => {
 
 describe('deletion of a blog', async () => {
 
+  let addedBlog, auth, blogsBeforeOp, goodUserId
+
   beforeAll(async () => {
     await User.remove({})
     const user = await User.hashPassword(newUser)
     await new User(user).save()
+    const authInfo = await getAuth()
+    auth = authInfo.auth
+    goodUserId = authInfo.id
   })
 
-  test('DELETE succeeds (204) with correct token if blog was in database', async () => {
-    const { auth, id } = await getAuth()
-    const blog = { ...newBlog, user: id }
+  beforeEach(async () => {
+    await Blog.remove({})
+    const blog = { ...newBlog, user: goodUserId }
     const blogDoc = new Blog(blog)
     await blogDoc.save()
     await blogDoc.populate('user', { blogs: 0 }).execPopulate()
-    const addedBlog = formatBlog(blogDoc.toObject())
-    const blogsBeforeOp = await blogsInDb()
+    addedBlog = formatBlog(blogDoc.toObject())
+    blogsBeforeOp = await blogsInDb()
+  })
+
+  test('DELETE succeeds (204) with correct token if blog was in database', async () => {
     expect(blogsBeforeOp).toContainEqual(addedBlog)
     await api.delete(`/api/blogs/${addedBlog.id}`).set('Authorization', auth)
       .expect(204)
@@ -201,9 +230,8 @@ describe('deletion of a blog', async () => {
   })
 
   test('DELETE returns 404 if blog wasn\'t in database', async () => {
-    const blogsBeforeOp = await blogsInDb()
+    expect(blogsBeforeOp).toContainEqual(addedBlog)
     const validNonexistingId = await nonExistingBlogId()
-    const { auth } = await getAuth()
     await api
       .delete(`/api/blogs/${validNonexistingId}`).set('Authorization', auth)
       .expect(404)
@@ -212,10 +240,57 @@ describe('deletion of a blog', async () => {
   })
 
   test('400 is returned by DELETE with invalid id', async () => {
-    const blogsBeforeOp = await blogsInDb()
-    const { auth } = await getAuth()
+    expect(blogsBeforeOp).toContainEqual(addedBlog)
     await api.delete('/api/blogs/5').set('Authorization', auth)
       .expect(400)
+    const blogsAfterOp = await blogsInDb()
+    expect(blogsAfterOp).toEqual(blogsBeforeOp)
+  })
+
+  test('401 is returned by DELETE without token', async () => {
+    expect(blogsBeforeOp).toContainEqual(addedBlog)
+    const res = await api
+      .delete(`/api/blogs/${addedBlog.id}`)
+      .expect(401)
+    expect(res.body.error).toContain('token missing')
+    const blogsAfterOp = await blogsInDb()
+    expect(blogsAfterOp).toEqual(blogsBeforeOp)
+  })
+
+  test('401 is returned by DELETE with invalid token (jwt malformed)', async () => {
+    expect(blogsBeforeOp).toContainEqual(addedBlog)
+    const badAuth = 'bearer bear334'
+    const res = await api
+      .delete(`/api/blogs/${addedBlog.id}`).set('Authorization', badAuth)
+      .expect(401)
+    expect(res.body.error).toContain('jwt malformed')
+    const blogsAfterOp = await blogsInDb()
+    expect(blogsAfterOp).toEqual(blogsBeforeOp)
+  })
+
+  test('401 is returned by DELETE with invalid token (no id)', async () => {
+    expect(blogsBeforeOp).toContainEqual(addedBlog)
+    const badAuth = getAuthNoId()
+    const res = await api
+      .delete(`/api/blogs/${addedBlog.id}`).set('Authorization', badAuth)
+      .expect(401)
+    expect(res.body.error).toContain('invalid token (no id)')
+    const blogsAfterOp = await blogsInDb()
+    expect(blogsAfterOp).toEqual(blogsBeforeOp)
+  })
+
+  test('401 is returned by DELETE with invalid token (unauthorized user)', async () => {
+    expect(blogsBeforeOp).toContainEqual(addedBlog)
+    const username = 'badboi'
+    let badUser = { username, name: 'xxx', password: 'k' }
+    badUser = await User.hashPassword(badUser)
+    await new User(badUser).save()
+    badUser = await User.findOne({ username })
+    const { auth: badAuth } = await getAuth(badUser)
+    const res = await api
+      .delete(`/api/blogs/${addedBlog.id}`).set('Authorization', badAuth)
+      .expect(401)
+    expect(res.body.error).toContain('invalid token (unauthorized user)')
     const blogsAfterOp = await blogsInDb()
     expect(blogsAfterOp).toEqual(blogsBeforeOp)
   })

@@ -57,6 +57,29 @@ blogsRouter.post('/', async (req, res) => {
   }
 })
 
+blogsRouter.post('/:id/comments', async (req, res) => {
+  try {
+    const id = req.params.id
+    const blog = await Blog.findById(id)
+    if (!blog)
+      return res.status(404).send({ error: 'that blog was removed' })
+    blog.comments.push(req.body.comment)
+    const updatedBlog = await Blog
+      .findByIdAndUpdate(id, blog, { new: true })
+    if (updatedBlog)
+      res.status(201).json(updatedBlog.comments)
+    else
+      res.status(404).send({ error: 'that blog was removed' })
+  } catch(e) {
+    if (e.name === 'CastError')
+      res.status(400).json({ error: 'malformatted id' })
+    else {
+      console.log(e)
+      res.status(500).json({ error: '500 server error' })
+    }
+  }
+})
+
 blogsRouter.put('/:id', async (req, res) => {
   try {
     const { title, author, url, likes } = req.body
@@ -94,7 +117,7 @@ blogsRouter.delete('/:id', async (req, res) => {
       return res.status(401).json({ error: 'token missing' })
     const decodedToken = jwt.verify(token, process.env.SECRET)
     if (!decodedToken.id)
-      return res.status(401).json({ error: 'invalid token' })
+      return res.status(401).json({ error: 'invalid token (no id)' })
     const blog = await Blog.findById(req.params.id)
     if (!blog)
       return res.status(404).end()
@@ -105,7 +128,7 @@ blogsRouter.delete('/:id', async (req, res) => {
       else
         res.status(404).end()
     } else
-      res.status(401).json({ error: 'invalid token' })
+      res.status(401).json({ error: 'invalid token (unauthorized user)' })
   } catch (e) {
     if (e.name === 'CastError')
       res.status(400).json({ error: 'malformatted id' })
