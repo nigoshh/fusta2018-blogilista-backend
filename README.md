@@ -1,8 +1,10 @@
-# fusta2018-blogilista-backend
+# fusta2018-blogilista-backend [![Build Status](https://travis-ci.com/nigoshh/fusta2018-blogilista-backend.svg?branch=master)](https://travis-ci.com/nigoshh/fusta2018-blogilista-backend)
 
 University of Helsinki Full stack open 2018 course assignments
 
-[frontend](https://github.com/nigoshh/fusta2018/tree/master/anekdootit/bloglist-frontend)
+[git-frontend](https://github.com/nigoshh/fusta2018/tree/master/anekdootit/bloglist-frontend)
+[heroku-backend](https://bloglist-be.herokuapp.com)
+[heroku-frontend](https://bloglist-fe.herokuapp.com)
 
 NB: to deploy this software (backend, frontend or both) with your own MongoDB database, please create a unique index for the field _username_ in the collection _bloglist-users_. Otherwise username uniqueness isn't enforced, therefore the software doesn't work as intended.
 

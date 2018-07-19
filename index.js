@@ -11,7 +11,6 @@ mongoose
 
 app.use(require('cors')())
 app.use(require('body-parser').json())
-app.use(express.static('build'))
 
 app.use(middleware.logger)
 app.use(middleware.tokenExtractor)
