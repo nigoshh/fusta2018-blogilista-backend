@@ -17,10 +17,6 @@ module.exports = {
             "error",
             2
         ],
-        "linebreak-style": [
-            "error",
-            "windows"
-        ],
         "no-console": 0,
         "no-trailing-spaces": "error",
         "object-curly-spacing": [
