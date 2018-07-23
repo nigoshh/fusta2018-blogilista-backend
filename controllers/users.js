@@ -7,6 +7,19 @@ usersRouter.get('/', async (req, res) => {
   res.json(users.map(formatUser))
 })
 
+usersRouter.get('/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .populate('blogs', { user: 0 })
+    if (user)
+      res.json(formatUser(user))
+    else
+      res.status(404).end()
+  } catch (e) {
+    res.status(400).json({ error: 'malformatted id' })
+  }
+})
+
 usersRouter.post('/', async (req, res) => {
   let error = ''
   try {
